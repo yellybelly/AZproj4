@@ -1,0 +1,106 @@
+---
+title: "Project 4"
+output:
+  html_document:
+    toc: yes
+    toc_depth: '3'
+    df_print: paged
+  html_notebook:
+    pandoc_args: --number-offset=1,0
+    fig_caption: yes
+    number_sections: yes
+    toc: yes
+    toc_depth: 3
+---
+
+```{r}
+library(tm)
+library(caTools)
+sh = read.csv("spam_ham_dataset.csv")
+```
+After loading the data set into R, we will look at its structure
+```{r}
+head(sh)
+str(sh)
+```
+
+Now, let's check how many are labeled as 'spam' and 'not-spam'
+```{r}
+table(sh$label_num)
+```
+
+Now, let's create the corpus and clean the text:
+Convert into lower, remove punctuation, and remove stop words.
+Turn into a Document Term Matrix, called "doc_tm"
+```{r}
+corpus = VCorpus(VectorSource(sh$text))
+corpus = tm_map(corpus, content_transformer(tolower))
+corpus = tm_map(corpus, PlainTextDocument)
+corpus = tm_map(corpus, removePunctuation)
+corpus = tm_map(corpus, removeWords, stopwords("en"))
+doc_tm = DocumentTermMatrix(corpus)
+doc_tm
+```
+Now let's remove the sparse terms in the matrix and create a data frame, called "sh1"
+
+```{r}
+rem = removeSparseTerms(doc_tm, 0.85)
+rem
+```
+
+```{r}
+sh1 = as.data.frame(as.matrix(rem))
+```
+
+Now, we will use the 'colSums' function to see the frequency of each word in the data set
+```{r}
+colnames(colSums(sh1))
+sort(colSums(sh1))
+```
+
+
+```{r}
+sh1$spam = sh$label_num
+sort(colSums(subset(sh1, "label_num" == 0)))
+sort(colSums(subset(sh1, "label_num" == 1)))
+```
+```{r}
+sh1$spam = as.factor(sh1$spam)
+```
+
+Now, let's see the accuracy of the data adn create a subset of the spam model, and a subset of the non-spam model
+```{r}
+set.seed(123)
+split = sample.split(sh1$spam, .8)
+train_set = subset(sh1, split == TRUE)
+test_set = subset(sh1, split == FALSE)
+spams = glm(spam~., data = train_set, family = "binomial")
+```
+
+
+Now, for some predictions
+
+```{r}
+pred = predict(spams, type = "response")
+table(train_set$spam, pred > 0.5)
+```
+
+```{r}
+accuracy1 = (2571+1082)/nrow(train_set)
+```
+
+```{r}
+pred2 = predict(spams, newdata = test_set, type = "response")
+table(test_set$spam, pred2 > 0.5)
+```
+
+```{r}
+accuracy2 = (662+278)/nrow(test_set)
+```
+
+```{r}
+accuracy1
+accuracy2
+```
+
+This shows that the accuracy is around 90%.
